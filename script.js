@@ -1,6 +1,6 @@
 // Configure os valores abaixo após publicar o Web App do Apps Script e criar o OAuth Client ID.
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxpJhMLFUwZ14i8DohSPcqoAJEiEKxTnWy4Un1OzihTCFNzREy2S9Mx5Wa2irmTdoZ0VQ/exec';
-const GOOGLE_CLIENT_ID = 'COLE_SEU_CLIENT_ID_AQUI';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU6PYGTJYlP_yAQygw8LhOmqzYlQzqXksje9YMsd7E62rHiW_K8DjotyS2356QMPQ/exec';
+const GOOGLE_CLIENT_ID = '1054091680574-o7op57beh1h7dh8na65borsdn36sh19r.apps.googleusercontent.com';
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const PREVIEW_LIMIT = 5;
 

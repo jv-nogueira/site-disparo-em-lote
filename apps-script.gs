@@ -1,6 +1,7 @@
 const SPREADSHEET_NAME = 'DispararEmail';
+const SPREADSHEET_ID = '1LEfGa_tTBEy29BQH8F6u01YK2pwzR0AlrMvbyGj59B4';
 const LOG_SHEET_NAME = 'Log';
-const GOOGLE_CLIENT_ID = 'COLE_SEU_CLIENT_ID_AQUI';
+const GOOGLE_CLIENT_ID = '1054091680574-o7op57beh1h7dh8na65borsdn36sh19r.apps.googleusercontent.com';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo?access_token=';
 const GOOGLE_USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
@@ -15,9 +16,9 @@ function jsonResponse(data) {
 }
 
 function getLogSheet() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   if (!spreadsheet || spreadsheet.getName() !== SPREADSHEET_NAME) {
-    throw new Error('Vincule este Apps Script à planilha chamada "DispararEmail".');
+    throw new Error('O ID configurado precisa apontar para a planilha chamada "DispararEmail".');
   }
   const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME) || spreadsheet.insertSheet(LOG_SHEET_NAME);
   const expectedHeaders = ['Nome', 'E-mail', 'Data', 'Ator', 'Status'];

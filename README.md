@@ -28,15 +28,15 @@ Aplicação estática em JavaScript que lê uma planilha no navegador, personali
 
 ## Configuração da planilha e do Apps Script
 
-1. Crie uma planilha Google chamada **DispararEmail**.
-2. Na planilha, abra **Extensões > Apps Script** e substitua o conteúdo do editor pelo arquivo `apps-script.gs`. O script precisa permanecer vinculado a essa planilha.
+1. Use a planilha Google **DispararEmail**. O código abaixo já está configurado para o ID `1LEfGa_tTBEy29BQH8F6u01YK2pwzR0AlrMvbyGj59B4`.
+2. Use um projeto Apps Script **independente**, separado dos projetos que atendem outros sites. No projeto novo, mantenha somente o código de `apps-script.gs`; ele abre a planilha pelo ID usando `SpreadsheetApp.openById`.
 3. Substitua `COLE_SEU_CLIENT_ID_AQUI` no Apps Script pelo Client ID OAuth criado acima.
 4. Em **Configurações do projeto > Projeto do Google Cloud**, vincule o projeto Apps Script ao mesmo projeto Google Cloud onde a Gmail API e o Client ID foram configurados. Confira o número do projeto antes de salvar a alteração.
-5. Salve o projeto e execute `setupLog` no editor para criar/corrigir o cabeçalho e iniciar a autorização; aceite as permissões de acesso à planilha e de chamadas externas. Se necessário, revise **Configurações do projeto > Mostrar o arquivo de manifesto `appsscript.json`** e confirme que os escopos de planilha e `https://www.googleapis.com/auth/script.external_request` estão presentes.
+5. Salve o projeto e execute `setupLog` no editor para criar/corrigir o cabeçalho e iniciar a autorização; aceite as permissões de acesso à planilha e de chamadas externas. Se necessário, revise **Configurações do projeto > Mostrar o arquivo de manifesto `appsscript.json`** e confirme que os escopos `https://www.googleapis.com/auth/spreadsheets` e `https://www.googleapis.com/auth/script.external_request` estão presentes.
 6. No Apps Script, selecione **Implantar > Nova implantação > App da Web**:
    - **Executar como:** sua conta Google (proprietário da planilha).
    - **Quem tem acesso:** qualquer pessoa, para que o front-end estático consiga chamar o endpoint. O login/escopo do usuário é validado no código antes de chamar a Gmail API.
-7. Implante, copie a URL terminada em `/exec` e cole em `GOOGLE_SCRIPT_URL` no `script.js`.
+7. Implante e copie a URL terminada em `/exec`. O `script.js` já contém a URL da implantação informada para o projeto **Disparar-em-lote**. Se uma implantação nova gerar outra URL, atualize `GOOGLE_SCRIPT_URL` no `script.js`.
 8. Publique o site por HTTPS, por exemplo no GitHub Pages, e inclua essa origem no OAuth Client ID. Para atualizar o backend, use **Implantar > Gerenciar implantações > Editar > Nova versão > Implantar**.
 9. A primeira linha da aba `Log` será criada automaticamente com `Nome`, `E-mail`, `Data`, `Ator` e `Status`; cada processamento insere uma linha nova na posição 2.
 
