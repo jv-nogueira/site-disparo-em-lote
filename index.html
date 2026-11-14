@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Envie e-mails personalizados a partir de uma planilha, usando sua conta Google." />
+    <title>Disparo de e-mails</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <div class="auth-panel">
+          <div class="auth-details">
+            <strong>Conta remetente</strong>
+            <span id="auth-status" aria-live="polite">Entre com a conta Google que enviará os e-mails.</span>
+          </div>
+          <div class="auth-actions">
+            <button type="button" class="google-button" id="google-signin-button">Entrar com Google</button>
+            <button type="button" class="secondary" id="google-signout-button" hidden>Sair</button>
+          </div>
+        </div>
+
+        <header class="header">
+          <p class="eyebrow">Envio personalizado</p>
+          <h1>Disparar e-mails em lote</h1>
+          <p class="intro">Cada mensagem é enviada individualmente pela conta Google conectada.</p>
+        </header>
+
+        <form id="mail-form">
+          <section class="field-group">
+            <h2>1. Lista de contatos</h2>
+            <label class="upload-box" for="spreadsheet-file">
+              <span class="upload-icon" aria-hidden="true">↑</span>
+              <strong>Escolha uma planilha para carregar</strong>
+              <span>Formatos aceitos: .xlsx, .xls e .csv</span>
+              <span class="file-name" id="spreadsheet-name">Nenhum arquivo selecionado</span>
+            </label>
+            <input id="spreadsheet-file" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
+            <p class="help-text">A primeira linha deve conter cabeçalhos. É necessário ter uma coluna de e-mail (por exemplo, “E-mail” ou “Email”); “Nome” é opcional.</p>
+            <div id="contacts-summary" class="contacts-summary" aria-live="polite">Carregue uma planilha para ver os contatos válidos.</div>
+            <div class="table-wrap" id="contacts-preview-wrap" hidden>
+              <table>
+                <thead><tr><th>Nome</th><th>E-mail</th></tr></thead>
+                <tbody id="contacts-preview"></tbody>
+              </table>
+              <p class="help-text">Prévia dos primeiros contatos válidos.</p>
+            </div>
+          </section>
+
+          <section class="field-group">
+            <h2>2. Escreva sua mensagem</h2>
+            <label>
+              <span>Assunto</span>
+              <input id="subject" type="text" maxlength="200" placeholder="Ex.: Oportunidade para [nome]" required />
+            </label>
+            <label>
+              <span>Corpo do e-mail</span>
+              <textarea id="message" rows="9" placeholder="Olá [nome], [saudacao]&#10;&#10;Escreva sua mensagem para [empresa]..." required></textarea>
+            </label>
+            <p class="help-text">Use [nome do cabeçalho] para inserir os valores da linha. Os espaços e maiúsculas/minúsculas não importam. [saudacao] é preenchida automaticamente.</p>
+          </section>
+
+          <section class="field-group">
+            <h2>3. Anexo opcional</h2>
+            <label class="attachment-picker">
+              <span>Arquivo PDF</span>
+              <input id="attachment-file" type="file" accept="application/pdf,.pdf" />
+            </label>
+            <p class="help-text">O mesmo PDF será anexado a todos os e-mails. Limite recomendado: 10 MB.</p>
+          </section>
+
+          <section class="progress-panel" aria-live="polite">
+            <div class="progress-heading">
+              <strong id="progress-status">Pronto para começar</strong>
+              <span id="progress-count">0 / 0</span>
+            </div>
+            <progress id="send-progress" value="0" max="1">0%</progress>
+            <p id="progress-detail" class="help-text">O resultado de cada destinatário será registrado na aba Log.</p>
+          </section>
+
+          <div class="actions">
+            <button type="button" class="secondary" id="reset-button">Limpar formulário</button>
+            <button type="submit" class="primary" id="submit-button" disabled>Iniciar envio</button>
+          </div>
+        </form>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <footer class="site-footer">O envio utiliza a conta Google que você autorizou.</footer>
+      </section>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>
