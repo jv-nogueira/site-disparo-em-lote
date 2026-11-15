@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Envie e-mails personalizados a partir de uma planilha, usando sua conta Google." />
-    <title>Disparo de e-mails</title>
+    <meta name="description" content="Envie e-mails personalizados pela sua conta Google com controle e pré-visualização." />
+    <title>Disparo de e-mails | Envio personalizado</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=4" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   </head>
@@ -28,8 +28,8 @@
 
         <header class="header">
           <p class="eyebrow">Envio personalizado</p>
-          <h1>Disparar e-mails em lote</h1>
-          <p class="intro">Cada mensagem é enviada individualmente pela conta Google conectada.</p>
+          <h1>Campanha de e-mails</h1>
+          <p class="intro">Personalize cada mensagem com os dados da planilha. Os envios são feitos individualmente pela conta Google conectada.</p>
         </header>
 
         <form id="mail-form">
@@ -63,7 +63,28 @@
               <span>Corpo do e-mail</span>
               <textarea id="message" rows="9" placeholder="Olá [nome], [saudacao]&#10;&#10;Escreva sua mensagem para [empresa]..." required></textarea>
             </label>
-            <p class="help-text">Use [nome do cabeçalho] para inserir os valores da linha. Os espaços e maiúsculas/minúsculas não importam. [saudacao] é preenchida automaticamente.</p>
+            <p class="help-text">As tags devem corresponder exatamente ao cabeçalho, ignorando apenas espaços no início e no fim. Ex.: o cabeçalho “E-mail” usa [E-mail]. [saudacao] é preenchida automaticamente.</p>
+            <div class="message-tools">
+              <button type="button" class="secondary" id="tags-toggle" aria-expanded="false" aria-controls="tags-panel" disabled>Ver tags da primeira linha</button>
+              <button type="button" class="secondary" id="preview-email-button" disabled>Pré-visualizar e-mail</button>
+            </div>
+            <section id="tags-panel" class="tags-panel" aria-live="polite" hidden>
+              <h3>Tags e valores do primeiro contato válido</h3>
+              <p class="help-text">Use o nome do cabeçalho exatamente como aparece abaixo, entre colchetes.</p>
+              <ul id="tags-list" class="tags-list"></ul>
+            </section>
+            <button type="button" class="text-button" id="copies-toggle" aria-expanded="false" aria-controls="copies-panel">Adicionar Cc ou Cco</button>
+            <div id="copies-panel" class="copies-panel" hidden>
+              <label>
+                <span>Cc — cópia (opcional)</span>
+                <input id="cc" type="text" inputmode="email" placeholder="pessoa@dominio.com, outra@dominio.com" />
+              </label>
+              <label>
+                <span>Cco — cópia oculta (opcional)</span>
+                <input id="bcc" type="text" inputmode="email" placeholder="pessoa@dominio.com, outra@dominio.com" />
+              </label>
+              <p class="help-text">Separe vários endereços por vírgula ou ponto e vírgula. Essas cópias serão aplicadas a todas as mensagens do lote.</p>
+            </div>
           </section>
 
           <section class="field-group">
@@ -72,28 +93,61 @@
               <span>Arquivo PDF</span>
               <input id="attachment-file" type="file" accept="application/pdf,.pdf" />
             </label>
+            <div class="attachment-selected" id="attachment-selected" hidden>
+              <span class="attachment-name" id="attachment-name"></span>
+              <button type="button" class="remove-attachment" id="remove-attachment" aria-label="Remover PDF selecionado" title="Remover PDF">&times;</button>
+            </div>
             <p class="help-text">O mesmo PDF será anexado a todos os e-mails. Limite recomendado: 10 MB.</p>
           </section>
 
-          <section class="progress-panel" aria-live="polite">
+          <section class="progress-panel" id="progress-panel" aria-live="polite" hidden>
             <div class="progress-heading">
               <strong id="progress-status">Pronto para começar</strong>
               <span id="progress-count">0 / 0</span>
             </div>
             <progress id="send-progress" value="0" max="1">0%</progress>
-            <p id="progress-detail" class="help-text">O resultado de cada destinatário será registrado na aba Log.</p>
+            <p id="progress-detail" class="help-text">O resultado de cada destinatário será registrado na aba Log-SaaS.</p>
           </section>
 
           <div class="actions">
-            <button type="button" class="secondary" id="reset-button">Limpar formulário</button>
-            <button type="submit" class="primary" id="submit-button" disabled>Iniciar envio</button>
+            <div class="actions-right">
+              <button type="button" class="secondary" id="reset-button">Novo lote / limpar formulário</button>
+              <button type="submit" class="primary" id="submit-button" disabled>Iniciar envio</button>
+            </div>
           </div>
         </form>
 
         <div id="status" class="status" role="status" aria-live="polite"></div>
-        <footer class="site-footer">O envio utiliza a conta Google que você autorizou.</footer>
+        <footer class="site-footer">
+          <span>O envio utiliza a conta Google que você autorizou.</span>
+          <a href="privacidade.html">Política de Privacidade</a>
+        </footer>
       </section>
     </main>
-    <script src="script.js"></script>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="preview-modal" class="modal-overlay" aria-hidden="true">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Prévia personalizada</p>
+            <h2 id="preview-title">Pré-visualização do e-mail</h2>
+          </div>
+          <button type="button" class="modal-close-btn" id="preview-close" aria-label="Fechar prévia">&times;</button>
+        </header>
+        <div class="modal-email-meta">
+          <div class="meta-row"><span class="meta-label">Para:</span><span id="preview-to" class="meta-value"></span></div>
+          <div class="meta-row" id="preview-cc-row" hidden><span class="meta-label">Cc:</span><span id="preview-cc" class="meta-value"></span></div>
+          <div class="meta-row" id="preview-bcc-row" hidden><span class="meta-label">Cco:</span><span id="preview-bcc" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">Assunto:</span><span id="preview-subject" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">Anexo:</span><span id="preview-attachment" class="meta-value"></span></div>
+        </div>
+        <div id="preview-body" class="modal-email-body"></div>
+        <footer class="modal-actions">
+          <button type="button" class="secondary" id="preview-back">Voltar e editar</button>
+          <button type="button" class="primary" id="preview-send">Iniciar envio</button>
+        </footer>
+      </section>
+    </div>
+    <script src="script.js?v=4"></script>
   </body>
 </html>

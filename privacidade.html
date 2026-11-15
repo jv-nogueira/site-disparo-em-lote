@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Política de Privacidade do Disparo de E-mails." />
+    <title>Política de Privacidade | Disparo de E-mails</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=3" />
+  </head>
+  <body>
+    <main class="container">
+      <article class="card privacy-card">
+        <header class="header">
+          <p class="eyebrow">Disparo de E-mails</p>
+          <h1>Política de Privacidade</h1>
+          <p class="privacy-updated">Última atualização: 14 de novembro de 2026</p>
+        </header>
+
+        <div class="privacy-content">
+          <p>
+            Esta política descreve como o Disparo de E-mails trata os dados usados para
+            personalizar e enviar mensagens. O usuário escolhe a conta Google remetente,
+            a planilha de contatos e o conteúdo de cada campanha.
+          </p>
+
+          <h2>Dados processados</h2>
+          <ul>
+            <li>
+              <strong>Conta Google:</strong> o endereço de e-mail da conta autenticada
+              é usado para identificar o remetente e preencher a coluna “Ator” do log.
+            </li>
+            <li>
+              <strong>Contatos:</strong> o arquivo XLSX, XLS ou CSV é lido localmente
+              no navegador. Para cada envio, os dados da respectiva linha, o assunto,
+              o corpo e os endereços de Cc/Cco informados são transmitidos ao Apps Script
+              e à Gmail API. O arquivo completo da planilha não é enviado como um único
+              documento.
+            </li>
+            <li>
+              <strong>Anexo:</strong> se selecionado, o PDF é enviado com cada mensagem
+              da campanha.
+            </li>
+            <li>
+              <strong>Token de acesso:</strong> o token OAuth é mantido em memória no
+              navegador durante a sessão e transmitido ao Apps Script para validar a
+              conta e chamar a Gmail API. O aplicativo não o grava em planilha nem em
+              armazenamento persistente.
+            </li>
+          </ul>
+
+          <h2>Finalidades e serviços Google</h2>
+          <p>
+            O escopo Gmail solicitado é usado para enviar, pela conta que concedeu a
+            autorização, as mensagens que o usuário preparou e confirmou. O Apps Script
+            valida a identidade, chama a Gmail API e grava o resultado no Google Sheets.
+            O aplicativo não lê a caixa de entrada nem usa o escopo para outras ações.
+          </p>
+          <p>
+            Google Identity Services, Gmail API, Apps Script e Google Sheets são
+            serviços do Google; o site é servido pelo GitHub Pages. A biblioteca de
+            planilhas e as fontes externas são carregadas por seus respectivos CDNs.
+            Esses fornecedores podem processar dados técnicos necessários para a
+            operação e segurança de suas plataformas, de acordo com as próprias
+            políticas de privacidade.
+          </p>
+
+          <h2>Armazenamento e retenção</h2>
+          <p>
+            A aba <strong>Log-SaaS</strong> da planilha “DispararEmail” registra o nome do
+            contato, o endereço principal, a data, a conta remetente e o status
+            “Enviado” ou “Erro”. Assunto, corpo, Cc, Cco e conteúdo do PDF não são
+            gravados nessas colunas. O log permanece na planilha até que seu
+            administrador o exclua. As mensagens enviadas e anexos ficam sujeitos às
+            regras de armazenamento da conta Gmail remetente.
+          </p>
+
+          <h2>Compartilhamento e controle</h2>
+          <p>
+            A mensagem e o PDF são enviados aos destinatários indicados, incluindo as
+            pessoas adicionadas em Cc ou Cco. A planilha de contatos não é publicada
+            pelo aplicativo. O acesso ao log é controlado pelas permissões da planilha.
+            O usuário pode revogar a autorização do aplicativo nas configurações de
+            segurança da Conta Google. Revogar o acesso não apaga e-mails já enviados
+            nem registros existentes no Sheets.
+          </p>
+
+          <h2>Responsabilidade pelo conteúdo e pelos contatos</h2>
+          <p>
+            O usuário é responsável por possuir autorização ou outra base legal para
+            contatar as pessoas da lista, por revisar os destinatários e pelo conteúdo
+            enviado. O sistema não deve ser usado para spam, listas compradas ou
+            mensagens não solicitadas.
+          </p>
+
+          <h2>Solicitações e contato</h2>
+          <p>
+            Para dúvidas sobre esta política ou solicitações relativas aos registros
+            do sistema, entre em contato pelo e-mail
+            <a href="mailto:jvnogueira2010@gmail.com">jvnogueira2010@gmail.com</a>.
+            A exclusão de registros da planilha deve ser solicitada ao administrador
+            da planilha.
+          </p>
+
+          <h2>Alterações</h2>
+          <p>
+            Esta política poderá ser revista quando o serviço ou o tratamento de dados
+            mudar. A data de atualização será alterada para refletir a revisão mais
+            recente.
+          </p>
+        </div>
+
+        <footer class="site-footer">
+          <a href="./">Voltar ao formulário</a>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

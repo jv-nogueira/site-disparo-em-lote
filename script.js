@@ -1,8 +1,28 @@
 // Configure os valores abaixo após publicar o Web App do Apps Script e criar o OAuth Client ID.
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU6PYGTJYlP_yAQygw8LhOmqzYlQzqXksje9YMsd7E62rHiW_K8DjotyS2356QMPQ/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzBVqnpU0s5sWc2lcWdDDBMQ3ch75JKDJl7xxyX94BxRnfh-SORONdM4e0HC6WhySM/exec';
 const GOOGLE_CLIENT_ID = '1054091680574-o7op57beh1h7dh8na65borsdn36sh19r.apps.googleusercontent.com';
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const PREVIEW_LIMIT = 5;
+const DEFAULT_SUBJECT = 'Candidatura - João Vitor Nogueira';
+const DEFAULT_MESSAGE = `Olá [Nome], [saudacao]
+
+Tudo bem?
+
+Meu nome é João Vitor Nogueira e trabalho focado em automação de TI.
+
+Tenho experiência em criar crawlers, scrapers e automações (RPA) que reduzem o trabalho manual.
+
+Você pode consultar mais detalhes sobre meus projetos e experiências nos links abaixo:
+LinkedIn: https://www.linkedin.com/in/nogueira-jv/
+GitHub: https://github.com/jv-nogueira
+
+Fico à disposição para esclarecimentos adicionais ou para uma eventual entrevista.
+
+Agradeço desde já pela atenção e pelo tempo dedicado!
+
+Atenciosamente,
+João Vitor Nogueira
+(11) 9 7776-8397`;
 
 const form = document.getElementById('mail-form');
 const authStatus = document.getElementById('auth-status');
@@ -16,13 +36,31 @@ const previewBody = document.getElementById('contacts-preview');
 const subjectInput = document.getElementById('subject');
 const messageInput = document.getElementById('message');
 const attachmentInput = document.getElementById('attachment-file');
+const attachmentSelected = document.getElementById('attachment-selected');
+const attachmentName = document.getElementById('attachment-name');
+const removeAttachmentButton = document.getElementById('remove-attachment');
+const ccInput = document.getElementById('cc');
+const bccInput = document.getElementById('bcc');
 const submitButton = document.getElementById('submit-button');
 const resetButton = document.getElementById('reset-button');
 const statusBox = document.getElementById('status');
+const progressPanel = document.getElementById('progress-panel');
 const progressBar = document.getElementById('send-progress');
 const progressStatus = document.getElementById('progress-status');
 const progressCount = document.getElementById('progress-count');
 const progressDetail = document.getElementById('progress-detail');
+const tagsToggle = document.getElementById('tags-toggle');
+const tagsPanel = document.getElementById('tags-panel');
+const tagsList = document.getElementById('tags-list');
+const copiesToggle = document.getElementById('copies-toggle');
+const copiesPanel = document.getElementById('copies-panel');
+const previewButton = document.getElementById('preview-email-button');
+const previewModal = document.getElementById('preview-modal');
+const previewClose = document.getElementById('preview-close');
+const previewBack = document.getElementById('preview-back');
+const previewSend = document.getElementById('preview-send');
+const toast = document.getElementById('toast');
+let toastTimer = null;
 
 let contacts = [];
 let columnNames = [];
@@ -31,11 +69,21 @@ let actorEmail = '';
 let tokenClient = null;
 let sending = false;
 let nextContactIndex = 0;
-let batchResults = { sent: 0, failed: 0, outcomeUnknown: 0 };
+let batchResults = { sent: 0, failed: 0, outcomeUnknown: 0, dailyQuota: false, apiDailyQuota: false, rateLimit: false };
 
 function setStatus(message, type = '') {
   statusBox.textContent = message;
   statusBox.className = `status ${type}`.trim();
+}
+
+function showToast(message, type = 'success', duration = 8000) {
+  clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.className = `toast ${type}`;
+  toast.hidden = false;
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, duration);
 }
 
 function setAuthenticated(email) {
@@ -47,16 +95,25 @@ function setAuthenticated(email) {
 }
 
 function updateSubmitState() {
-  submitButton.disabled = sending || !accessToken || contacts.length === 0;
-  submitButton.textContent = nextContactIndex > 0 && nextContactIndex < contacts.length
-    ? 'Continuar envio'
-    : 'Iniciar envio';
+  const batchComplete = contacts.length > 0 && nextContactIndex >= contacts.length;
+  submitButton.disabled = sending || !accessToken || contacts.length === 0 || batchComplete;
+  submitButton.textContent = batchComplete
+    ? 'Lote concluído'
+    : nextContactIndex > 0
+      ? 'Continuar envio'
+      : 'Iniciar envio';
   fileInput.disabled = sending;
   subjectInput.disabled = sending;
   messageInput.disabled = sending;
   attachmentInput.disabled = sending;
+  removeAttachmentButton.disabled = sending;
+  ccInput.disabled = sending;
+  bccInput.disabled = sending;
   resetButton.disabled = sending;
   signOutButton.disabled = sending;
+  tagsToggle.disabled = sending || contacts.length === 0;
+  previewButton.disabled = sending || contacts.length === 0;
+  previewSend.disabled = sending || !accessToken;
 }
 
 function normalizeHeader(value) {
@@ -87,6 +144,7 @@ function renderContactsPreview() {
   contactsSummary.textContent = contacts.length
     ? `${contacts.length} contato(s) válido(s) carregado(s).`
     : 'Nenhum contato com e-mail válido foi encontrado.';
+  updateTagsPanel();
   updateSubmitState();
 }
 
@@ -94,7 +152,13 @@ function loadSpreadsheet(file) {
   contacts = [];
   columnNames = [];
   nextContactIndex = 0;
-  batchResults = { sent: 0, failed: 0, outcomeUnknown: 0 };
+  batchResults = { sent: 0, failed: 0, outcomeUnknown: 0, dailyQuota: false, apiDailyQuota: false, rateLimit: false };
+  progressPanel.hidden = true;
+  progressBar.value = 0;
+  progressBar.max = 1;
+  progressCount.textContent = '0 / 0';
+  progressStatus.textContent = 'Pronto para começar';
+  progressDetail.textContent = 'O resultado de cada destinatário será registrado na aba Log-SaaS.';
   fileName.textContent = file ? file.name : 'Nenhum arquivo selecionado';
   renderContactsPreview();
 
@@ -127,6 +191,9 @@ function loadSpreadsheet(file) {
       const emailIndex = columnNames.findIndex((header) => normalizeHeader(header) === 'email');
       const nameIndex = columnNames.findIndex((header) => normalizeHeader(header) === 'nome');
       if (emailIndex < 0) throw new Error('Não encontrei uma coluna “E-mail” ou “Email” no cabeçalho da primeira linha.');
+      if (nameIndex >= 0 && messageInput.value === DEFAULT_MESSAGE) {
+        messageInput.value = DEFAULT_MESSAGE.replaceAll('[Nome]', `[${columnNames[nameIndex]}]`);
+      }
 
       contacts = rows.slice(1).map((row, rowOffset) => {
         const values = columnNames.map((_, index) => String(row[index] ?? '').trim());
@@ -164,14 +231,93 @@ function greetingForCurrentTime() {
 
 function renderTemplate(template, contact) {
   const valuesByHeader = new Map(
-    columnNames.map((header, index) => [normalizeHeader(header), contact.values[index] ?? ''])
+    columnNames.map((header, index) => [String(header).trim(), contact.values[index] ?? ''])
   );
-  valuesByHeader.set('saudacao', greetingForCurrentTime());
 
   return String(template).replace(/\[([^\]]+)\]/g, (tag, header) => {
-    const key = normalizeHeader(header);
+    const key = header.trim();
+    if (key === 'saudacao') return `${greetingForCurrentTime()}!`;
     return valuesByHeader.has(key) ? valuesByHeader.get(key) : tag;
   });
+}
+
+function updateTagsPanel() {
+  tagsList.replaceChildren();
+  const firstContact = contacts[0];
+  if (!firstContact) return;
+
+  const greeting = `${greetingForCurrentTime()}!`;
+  const hasGreetingColumn = columnNames.some((header) => String(header).trim() === 'saudacao');
+  columnNames.forEach((header, index) => {
+    const item = document.createElement('li');
+    const tag = document.createElement('code');
+    const name = String(header).trim();
+    tag.textContent = `[${name}]`;
+    const value = document.createElement('span');
+    value.textContent = ` = ${name === 'saudacao' ? greeting : (firstContact.values[index] || '(vazio)')}`;
+    item.append(tag, value);
+    tagsList.appendChild(item);
+  });
+
+  if (!hasGreetingColumn) {
+    const greetingItem = document.createElement('li');
+    const greetingTag = document.createElement('code');
+    greetingTag.textContent = '[saudacao]';
+    const greetingValue = document.createElement('span');
+    greetingValue.textContent = ` = ${greeting}`;
+    greetingItem.append(greetingTag, greetingValue);
+    tagsList.appendChild(greetingItem);
+  }
+}
+
+function parseEmailList(value, label) {
+  const emails = String(value || '')
+    .split(/[,;]/)
+    .map((email) => email.trim())
+    .filter(Boolean);
+  const invalid = emails.find((email) => !isValidEmail(email));
+  if (invalid) {
+    throw new Error(`Endereço inválido no campo ${label}: ${invalid}`);
+  }
+  return emails.join(',');
+}
+
+function openPreview() {
+  const contact = contacts[0];
+  if (!contact) {
+    setStatus('Carregue uma planilha com ao menos um e-mail válido para pré-visualizar.', 'error');
+    return;
+  }
+
+  document.getElementById('preview-to').textContent = contact.email;
+  const cc = ccInput.value.trim();
+  const bcc = bccInput.value.trim();
+  document.getElementById('preview-cc').textContent = cc;
+  document.getElementById('preview-cc-row').hidden = !cc;
+  document.getElementById('preview-bcc').textContent = bcc;
+  document.getElementById('preview-bcc-row').hidden = !bcc;
+  document.getElementById('preview-subject').textContent = renderTemplate(subjectInput.value, contact) || '(Sem assunto)';
+  document.getElementById('preview-attachment').textContent = attachmentInput.files[0]?.name || 'Sem anexo';
+  document.getElementById('preview-body').textContent = renderTemplate(messageInput.value, contact) || '(Mensagem vazia)';
+  previewModal.classList.add('active');
+  previewModal.setAttribute('aria-hidden', 'false');
+}
+
+function closePreview() {
+  previewModal.classList.remove('active');
+  previewModal.setAttribute('aria-hidden', 'true');
+}
+
+function updateAttachmentSelection() {
+  const selectedFile = attachmentInput.files[0] || null;
+  attachmentName.textContent = selectedFile ? selectedFile.name : '';
+  attachmentSelected.hidden = !selectedFile;
+}
+
+function removeAttachment() {
+  if (sending) return;
+  attachmentInput.value = '';
+  updateAttachmentSelection();
 }
 
 function fileToBase64(file) {
@@ -205,6 +351,7 @@ async function postEmail(payload) {
     }
     const error = new Error(result.error || `Falha no envio (HTTP ${response.status}).`);
     error.authRequired = result.authRequired === true;
+    error.quotaType = result.quotaType || '';
     throw error;
   }
   return result;
@@ -221,15 +368,22 @@ function updateProgress(done, total, status, detail = '') {
 async function sendBatch(event) {
   event.preventDefault();
   if (sending || !accessToken || contacts.length === 0) return;
-  if (nextContactIndex >= contacts.length) {
-    nextContactIndex = 0;
-    batchResults = { sent: 0, failed: 0, outcomeUnknown: 0 };
-  }
 
   const subjectTemplate = subjectInput.value.trim();
   const messageTemplate = messageInput.value.trim();
   if (!subjectTemplate || !messageTemplate) {
     setStatus('Preencha o assunto e o corpo do e-mail.', 'error');
+    return;
+  }
+
+  let cc;
+  let bcc;
+  try {
+    cc = parseEmailList(ccInput.value, 'Cc');
+    bcc = parseEmailList(bccInput.value, 'Cco');
+  } catch (error) {
+    setStatus(error.message, 'error');
+    showToast(error.message, 'error');
     return;
   }
 
@@ -250,8 +404,9 @@ async function sendBatch(event) {
 
   sending = true;
   updateSubmitState();
+  progressPanel.hidden = false;
   setStatus('', '');
-  updateProgress(nextContactIndex, contacts.length, 'Preparando envio', 'Cada resultado será gravado na aba Log.');
+  updateProgress(nextContactIndex, contacts.length, 'Preparando envio', 'Cada resultado será gravado na aba Log-SaaS.');
 
   let fileData = '';
   try {
@@ -264,6 +419,7 @@ async function sendBatch(event) {
   }
 
   let stoppedForAuth = false;
+  let stoppedForQuota = false;
 
   for (let index = nextContactIndex; index < contacts.length; index += 1) {
     const contact = contacts[index];
@@ -275,6 +431,8 @@ async function sendBatch(event) {
         accessToken,
         recipientEmail: contact.email,
         recipientName: contact.name,
+        cc,
+        bcc,
         subject: renderTemplate(subjectTemplate, contact),
         message: renderTemplate(messageTemplate, contact),
         fileName: attachment ? attachment.name : '',
@@ -291,32 +449,54 @@ async function sendBatch(event) {
         break;
       }
       batchResults.failed += 1;
+      nextContactIndex = index + 1;
+      if (error.quotaType === 'gmail-daily') {
+        batchResults.dailyQuota = true;
+        stoppedForQuota = true;
+      } else if (error.quotaType === 'api-daily') {
+        batchResults.apiDailyQuota = true;
+        stoppedForQuota = true;
+      } else if (error.quotaType === 'api-rate') {
+        batchResults.rateLimit = true;
+        stoppedForQuota = true;
+      }
       if (/Resposta inválida|Failed to fetch|NetworkError|Load failed/i.test(error.message)) {
         batchResults.outcomeUnknown += 1;
       }
-      nextContactIndex = index + 1;
       updateProgress(current, contacts.length, `Enviando ${current} de ${contacts.length}`, `Erro em ${contact.email}: ${error.message}`);
       console.error(`Falha ao processar a linha ${contact.rowNumber} (${contact.email}):`, error);
+      if (stoppedForQuota) break;
     }
   }
 
   sending = false;
   updateSubmitState();
   const processed = nextContactIndex;
-  const summary = stoppedForAuth
+  const summary = stoppedForQuota && batchResults.dailyQuota
+    ? `O Gmail informou que a conta atingiu o limite diário de envio. O lote foi pausado após ${processed} de ${contacts.length}; tente novamente amanhã (a liberação pode levar até 24 horas).`
+    : stoppedForQuota && batchResults.apiDailyQuota
+      ? `A cota diária da Gmail API deste projeto Cloud foi atingida. Isso é diferente do limite diário de envio da sua conta Gmail; confira as cotas do projeto e retome quando o Google liberar o uso.`
+      : stoppedForQuota
+      ? `A Gmail API atingiu um limite de uso do projeto. O lote foi pausado após ${processed} de ${contacts.length}; aguarde e tente continuar mais tarde.`
+      : stoppedForAuth
     ? `Envio pausado após ${processed} de ${contacts.length} contato(s). Entre novamente e use “Continuar envio” para retomar do contato pendente.`
-    : `${batchResults.sent} enviado(s), ${batchResults.failed} com erro.${batchResults.outcomeUnknown ? ` Resultado de ${batchResults.outcomeUnknown} solicitação(ões) não confirmado; verifique o Log antes de tentar novamente.` : ''}`;
+    : `${batchResults.sent} enviado(s), ${batchResults.failed} com erro.${batchResults.outcomeUnknown ? ` Resultado de ${batchResults.outcomeUnknown} solicitação(ões) não confirmado; verifique o Log-SaaS antes de tentar novamente.` : ''}`;
   updateProgress(
     processed,
     contacts.length,
-    stoppedForAuth ? 'Envio pausado' : 'Lote concluído',
+    stoppedForAuth || stoppedForQuota ? 'Envio pausado' : 'Lote concluído',
     summary
   );
   setStatus(
-    stoppedForAuth
-      ? `${summary} Consulte a aba Log antes de retomar.`
-      : `${batchResults.sent} e-mail(s) enviado(s); ${batchResults.failed} com erro. Consulte a aba Log para os resultados por destinatário.`,
-    batchResults.failed || stoppedForAuth ? 'error' : 'success'
+    stoppedForAuth || stoppedForQuota
+      ? `${summary} Consulte a aba Log-SaaS antes de retomar.`
+      : `${batchResults.sent} e-mail(s) enviado(s); ${batchResults.failed} com erro. Consulte a aba Log-SaaS para os resultados por destinatário.`,
+    batchResults.failed || stoppedForAuth || stoppedForQuota ? 'error' : 'success'
+  );
+  showToast(
+    summary,
+    stoppedForAuth || stoppedForQuota || batchResults.failed ? 'warning' : 'success',
+    12000
   );
 }
 
@@ -372,7 +552,34 @@ function signOut() {
 }
 
 fileInput.addEventListener('change', () => loadSpreadsheet(fileInput.files[0]));
+attachmentInput.addEventListener('change', updateAttachmentSelection);
+removeAttachmentButton.addEventListener('click', removeAttachment);
 form.addEventListener('submit', sendBatch);
+tagsToggle.addEventListener('click', () => {
+  const isExpanded = tagsToggle.getAttribute('aria-expanded') === 'true';
+  tagsToggle.setAttribute('aria-expanded', String(!isExpanded));
+  tagsPanel.hidden = isExpanded;
+  tagsToggle.textContent = isExpanded ? 'Ver tags da primeira linha' : 'Ocultar tags';
+});
+copiesToggle.addEventListener('click', () => {
+  const isExpanded = copiesToggle.getAttribute('aria-expanded') === 'true';
+  copiesToggle.setAttribute('aria-expanded', String(!isExpanded));
+  copiesPanel.hidden = isExpanded;
+  copiesToggle.textContent = isExpanded ? 'Adicionar Cc ou Cco' : 'Ocultar Cc e Cco';
+});
+previewButton.addEventListener('click', openPreview);
+previewClose.addEventListener('click', closePreview);
+previewBack.addEventListener('click', closePreview);
+previewSend.addEventListener('click', () => {
+  closePreview();
+  form.requestSubmit();
+});
+previewModal.addEventListener('click', (event) => {
+  if (event.target === previewModal) closePreview();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && previewModal.classList.contains('active')) closePreview();
+});
 signInButton.addEventListener('click', () => {
   if (!tokenClient) initializeOAuth();
   if (tokenClient) tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
@@ -384,15 +591,29 @@ resetButton.addEventListener('click', () => {
   contacts = [];
   columnNames = [];
   nextContactIndex = 0;
-  batchResults = { sent: 0, failed: 0, outcomeUnknown: 0 };
+  batchResults = { sent: 0, failed: 0, outcomeUnknown: 0, dailyQuota: false, apiDailyQuota: false, rateLimit: false };
   fileName.textContent = 'Nenhum arquivo selecionado';
-  renderContactsPreview();
+  updateAttachmentSelection();
+  tagsPanel.hidden = true;
+  tagsToggle.setAttribute('aria-expanded', 'false');
+  tagsToggle.textContent = 'Ver tags da primeira linha';
+  copiesPanel.hidden = true;
+  copiesToggle.setAttribute('aria-expanded', 'false');
+  copiesToggle.textContent = 'Adicionar Cc ou Cco';
+  progressPanel.hidden = true;
   progressBar.value = 0;
   progressBar.max = 1;
   progressCount.textContent = '0 / 0';
   progressStatus.textContent = 'Pronto para começar';
-  progressDetail.textContent = 'O resultado de cada destinatário será registrado na aba Log.';
+  progressDetail.textContent = 'O resultado de cada destinatário será registrado na aba Log-SaaS.';
+  subjectInput.value = DEFAULT_SUBJECT;
+  messageInput.value = DEFAULT_MESSAGE;
+  renderContactsPreview();
   setStatus('', '');
+  showToast('Formulário limpo e mensagem padrão restaurada.', 'success', 4000);
 });
 
+subjectInput.value = DEFAULT_SUBJECT;
+messageInput.value = DEFAULT_MESSAGE;
+updateSubmitState();
 window.addEventListener('load', initializeOAuth, { once: true });

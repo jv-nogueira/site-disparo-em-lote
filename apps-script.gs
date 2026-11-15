@@ -1,6 +1,6 @@
 const SPREADSHEET_NAME = 'DispararEmail';
 const SPREADSHEET_ID = '1LEfGa_tTBEy29BQH8F6u01YK2pwzR0AlrMvbyGj59B4';
-const LOG_SHEET_NAME = 'Log';
+const LOG_SHEET_NAME = 'Log-SaaS';
 const GOOGLE_CLIENT_ID = '1054091680574-o7op57beh1h7dh8na65borsdn36sh19r.apps.googleusercontent.com';
 const GMAIL_SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo?access_token=';
@@ -39,7 +39,7 @@ function getLogSheet() {
 function setupLog() {
   getLogSheet();
   UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v1/certs', { muteHttpExceptions: true });
-  Logger.log('Aba Log pronta na planilha ' + SPREADSHEET_NAME + '.');
+  Logger.log('Aba ' + LOG_SHEET_NAME + ' pronta na planilha ' + SPREADSHEET_NAME + '.');
 }
 
 function getActorEmail(accessToken) {
@@ -99,6 +99,20 @@ function sanitizeHeader(value, fieldName) {
   return text;
 }
 
+function cleanEmailHeader(value, fieldName) {
+  const emails = String(value || '')
+    .split(/[,;]/)
+    .map(function (email) { return email.trim(); })
+    .filter(function (email) { return email; });
+  const invalidEmail = emails.find(function (email) {
+    return !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email);
+  });
+  if (invalidEmail) {
+    throw new Error('Endereço inválido no campo ' + fieldName + ': ' + invalidEmail);
+  }
+  return emails.join(', ');
+}
+
 function encodeSubject(subject) {
   const characters = Array.from(subject);
   const chunks = [];
@@ -133,6 +147,8 @@ function wrapBase64(value) {
 function createRawEmail(payload) {
   const recipient = sanitizeHeader(payload.recipientEmail, 'E-mail');
   const subject = sanitizeHeader(payload.subject, 'Assunto');
+  const cc = cleanEmailHeader(payload.cc, 'Cc');
+  const bcc = cleanEmailHeader(payload.bcc, 'Cco');
   const body = String(payload.message || '');
   if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(recipient)) {
     throw new Error('O e-mail do destinatário é inválido.');
@@ -146,6 +162,8 @@ function createRawEmail(payload) {
     'Date: ' + new Date().toUTCString(),
     'MIME-Version: 1.0'
   ];
+  if (cc) headers.push('Cc: ' + cc);
+  if (bcc) headers.push('Bcc: ' + bcc);
   let rawMessage;
   if (payload.fileData) {
     const fileName = sanitizeHeader(payload.fileName || 'anexo.pdf', 'Nome do anexo');
@@ -196,14 +214,36 @@ function sendWithGmailApi(payload, accessToken) {
   const statusCode = response.getResponseCode();
   if (statusCode < 200 || statusCode >= 300) {
     let detail = response.getContentText();
+    let quotaType = '';
     try {
       const apiError = JSON.parse(detail);
       detail = apiError.error && apiError.error.message ? apiError.error.message : detail;
+      const reasons = apiError.error && apiError.error.errors
+        ? apiError.error.errors.map(function (entry) { return entry.reason || ''; })
+        : [];
+      const reasonList = reasons.join(' ').toLowerCase();
+      const errorText = String(detail).toLowerCase();
+      if (
+        /daily.{0,30}(send|sending).{0,30}(limit|quota)|(limit|quota).{0,30}daily.{0,30}(send|sending)/.test(errorText) ||
+        /reached a limit for sending mail|sending mail.{0,30}limit/.test(errorText)
+      ) {
+        quotaType = 'gmail-daily';
+      } else if (reasonList.indexOf('dailylimitexceeded') >= 0) {
+        quotaType = 'api-daily';
+      } else if (
+        statusCode === 429 ||
+        reasonList.indexOf('ratelimitexceeded') >= 0 ||
+        reasonList.indexOf('userratelimitexceeded') >= 0 ||
+        reasonList.indexOf('quotaexceeded') >= 0
+      ) {
+        quotaType = 'api-rate';
+      }
     } catch (error) {
       detail = detail || 'Resposta vazia da Gmail API.';
     }
     const apiError = new Error('Gmail API (' + statusCode + '): ' + String(detail).slice(0, 500));
     apiError.authRequired = statusCode === 401;
+    apiError.quotaType = quotaType;
     throw apiError;
   }
 }
@@ -258,6 +298,7 @@ function doPost(event) {
 
   let sendError = '';
   let sendAuthRequired = false;
+  let sendQuotaType = '';
   try {
     let sheet;
     try {
@@ -275,6 +316,7 @@ function doPost(event) {
     } catch (error) {
       sendError = error.message || String(error);
       sendAuthRequired = error.authRequired === true;
+      sendQuotaType = error.quotaType || '';
     }
 
     try {
@@ -297,6 +339,7 @@ function doPost(event) {
       logged: true,
       status: 'Erro',
       authRequired: sendAuthRequired,
+      quotaType: sendQuotaType,
       error: sendError
     });
   }
