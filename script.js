@@ -31,13 +31,18 @@ const signOutButton = document.getElementById('google-signout-button');
 const fileInput = document.getElementById('spreadsheet-file');
 const fileName = document.getElementById('spreadsheet-name');
 const contactsSummary = document.getElementById('contacts-summary');
-const previewWrap = document.getElementById('contacts-preview-wrap');
-const previewBody = document.getElementById('contacts-preview');
+const spreadsheetPreviewButton = document.getElementById('spreadsheet-preview-button');
+const spreadsheetPreviewModal = document.getElementById('spreadsheet-preview-modal');
+const spreadsheetPreviewHead = document.getElementById('spreadsheet-preview-head');
+const spreadsheetPreviewBody = document.getElementById('spreadsheet-preview-body');
+const spreadsheetPreviewClose = document.getElementById('spreadsheet-preview-close');
 const subjectInput = document.getElementById('subject');
 const messageInput = document.getElementById('message');
+const variableChips = document.getElementById('variable-chips');
 const attachmentInput = document.getElementById('attachment-file');
 const attachmentSelected = document.getElementById('attachment-selected');
 const attachmentName = document.getElementById('attachment-name');
+const attachmentSize = document.getElementById('attachment-size');
 const removeAttachmentButton = document.getElementById('remove-attachment');
 const ccInput = document.getElementById('cc');
 const bccInput = document.getElementById('bcc');
@@ -113,6 +118,7 @@ function updateSubmitState() {
   signOutButton.disabled = sending;
   tagsToggle.disabled = sending || contacts.length === 0;
   previewButton.disabled = sending || contacts.length === 0;
+  spreadsheetPreviewButton.disabled = sending || contacts.length === 0;
   previewSend.disabled = sending || !accessToken;
 }
 
@@ -129,23 +135,67 @@ function isValidEmail(email) {
 }
 
 function renderContactsPreview() {
-  previewBody.replaceChildren();
-  contacts.slice(0, PREVIEW_LIMIT).forEach((contact) => {
-    const row = document.createElement('tr');
-    const nameCell = document.createElement('td');
-    const emailCell = document.createElement('td');
-    nameCell.textContent = contact.name || '—';
-    emailCell.textContent = contact.email;
-    row.append(nameCell, emailCell);
-    previewBody.appendChild(row);
-  });
-
-  previewWrap.hidden = contacts.length === 0;
   contactsSummary.textContent = contacts.length
     ? `${contacts.length} contato(s) válido(s) carregado(s).`
     : 'Nenhum contato com e-mail válido foi encontrado.';
+  updateVariableChips();
   updateTagsPanel();
   updateSubmitState();
+}
+
+function updateVariableChips() {
+  variableChips.replaceChildren();
+  const headers = contacts.length ? columnNames : [];
+  const tags = ['saudacao', ...headers.filter((header) => header)];
+  [...new Set(tags)].forEach((header) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'variable-chip';
+    chip.textContent = `[${header}]`;
+    chip.addEventListener('click', () => {
+      const start = messageInput.selectionStart;
+      const end = messageInput.selectionEnd;
+      messageInput.setRangeText(`[${header}]`, start, end, 'end');
+      messageInput.focus();
+    });
+    variableChips.appendChild(chip);
+  });
+}
+
+function renderSpreadsheetPreview() {
+  spreadsheetPreviewHead.replaceChildren();
+  spreadsheetPreviewBody.replaceChildren();
+
+  const headerRow = document.createElement('tr');
+  columnNames.forEach((column) => {
+    const cell = document.createElement('th');
+    cell.textContent = column;
+    headerRow.appendChild(cell);
+  });
+  spreadsheetPreviewHead.appendChild(headerRow);
+
+  contacts.slice(0, PREVIEW_LIMIT).forEach((contact) => {
+    const row = document.createElement('tr');
+    contact.values.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value || '—';
+      row.appendChild(cell);
+    });
+    spreadsheetPreviewBody.appendChild(row);
+  });
+}
+
+function openSpreadsheetPreview() {
+  if (!contacts.length) return;
+  renderSpreadsheetPreview();
+  spreadsheetPreviewModal.classList.add('active');
+  spreadsheetPreviewModal.setAttribute('aria-hidden', 'false');
+  spreadsheetPreviewClose.focus();
+}
+
+function closeSpreadsheetPreview() {
+  spreadsheetPreviewModal.classList.remove('active');
+  spreadsheetPreviewModal.setAttribute('aria-hidden', 'true');
 }
 
 function loadSpreadsheet(file) {
@@ -311,7 +361,13 @@ function closePreview() {
 function updateAttachmentSelection() {
   const selectedFile = attachmentInput.files[0] || null;
   attachmentName.textContent = selectedFile ? selectedFile.name : '';
+  attachmentSize.textContent = selectedFile ? formatFileSize(selectedFile.size) : '';
   attachmentSelected.hidden = !selectedFile;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function removeAttachment() {
@@ -568,6 +624,8 @@ copiesToggle.addEventListener('click', () => {
   copiesToggle.textContent = isExpanded ? 'Adicionar Cc ou Cco' : 'Ocultar Cc e Cco';
 });
 previewButton.addEventListener('click', openPreview);
+spreadsheetPreviewButton.addEventListener('click', openSpreadsheetPreview);
+spreadsheetPreviewClose.addEventListener('click', closeSpreadsheetPreview);
 previewClose.addEventListener('click', closePreview);
 previewBack.addEventListener('click', closePreview);
 previewSend.addEventListener('click', () => {
@@ -577,8 +635,12 @@ previewSend.addEventListener('click', () => {
 previewModal.addEventListener('click', (event) => {
   if (event.target === previewModal) closePreview();
 });
+spreadsheetPreviewModal.addEventListener('click', (event) => {
+  if (event.target === spreadsheetPreviewModal) closeSpreadsheetPreview();
+});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && previewModal.classList.contains('active')) closePreview();
+  if (event.key === 'Escape' && spreadsheetPreviewModal.classList.contains('active')) closeSpreadsheetPreview();
 });
 signInButton.addEventListener('click', () => {
   if (!tokenClient) initializeOAuth();
@@ -609,11 +671,14 @@ resetButton.addEventListener('click', () => {
   subjectInput.value = DEFAULT_SUBJECT;
   messageInput.value = DEFAULT_MESSAGE;
   renderContactsPreview();
+  closeSpreadsheetPreview();
+  closePreview();
   setStatus('', '');
   showToast('Formulário limpo e mensagem padrão restaurada.', 'success', 4000);
 });
 
 subjectInput.value = DEFAULT_SUBJECT;
 messageInput.value = DEFAULT_MESSAGE;
+updateVariableChips();
 updateSubmitState();
 window.addEventListener('load', initializeOAuth, { once: true });

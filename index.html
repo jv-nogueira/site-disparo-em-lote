@@ -35,6 +35,7 @@
         <form id="mail-form">
           <section class="field-group">
             <h2>1. Lista de contatos</h2>
+            <a class="template-download" href="planilha-modelo.csv" download>↓ Baixar planilha-modelo (.csv)</a>
             <label class="upload-box" for="spreadsheet-file">
               <span class="upload-icon" aria-hidden="true">↑</span>
               <strong>Escolha uma planilha para carregar</strong>
@@ -43,13 +44,9 @@
             </label>
             <input id="spreadsheet-file" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv" />
             <p class="help-text">A primeira linha deve conter cabeçalhos. É necessário ter uma coluna de e-mail (por exemplo, “E-mail” ou “Email”); “Nome” é opcional.</p>
-            <div id="contacts-summary" class="contacts-summary" aria-live="polite">Carregue uma planilha para ver os contatos válidos.</div>
-            <div class="table-wrap" id="contacts-preview-wrap" hidden>
-              <table>
-                <thead><tr><th>Nome</th><th>E-mail</th></tr></thead>
-                <tbody id="contacts-preview"></tbody>
-              </table>
-              <p class="help-text">Prévia dos primeiros contatos válidos.</p>
+            <div class="contacts-summary-row">
+              <div id="contacts-summary" class="contacts-summary" aria-live="polite">Carregue uma planilha para ver os contatos válidos.</div>
+              <button type="button" class="secondary" id="spreadsheet-preview-button" disabled>Pré-visualizar planilha</button>
             </div>
           </section>
 
@@ -63,6 +60,8 @@
               <span>Corpo do e-mail</span>
               <textarea id="message" rows="9" placeholder="Olá [nome], [saudacao]&#10;&#10;Escreva sua mensagem para [empresa]..." required></textarea>
             </label>
+            <div class="variable-chips" id="variable-chips" aria-label="Inserir variável no corpo do e-mail"></div>
+            <p class="help-text">Clique em uma variável para inseri-la na posição atual do cursor. As tags também podem ser usadas no assunto.</p>
             <p class="help-text">As tags devem corresponder exatamente ao cabeçalho, ignorando apenas espaços no início e no fim. Ex.: o cabeçalho “E-mail” usa [E-mail]. [saudacao] é preenchida automaticamente.</p>
             <div class="message-tools">
               <button type="button" class="secondary" id="tags-toggle" aria-expanded="false" aria-controls="tags-panel" disabled>Ver tags da primeira linha</button>
@@ -89,12 +88,17 @@
 
           <section class="field-group">
             <h2>3. Anexo opcional</h2>
-            <label class="attachment-picker">
-              <span>Arquivo PDF</span>
-              <input id="attachment-file" type="file" accept="application/pdf,.pdf" />
+            <label class="upload-box attachment-upload-box" for="attachment-file">
+              <span class="upload-icon attachment-icon" aria-hidden="true">PDF</span>
+              <strong>Selecionar arquivo PDF</strong>
+              <span>Toque para escolher um anexo</span>
             </label>
+            <input id="attachment-file" class="visually-hidden" type="file" accept="application/pdf,.pdf" />
             <div class="attachment-selected" id="attachment-selected" hidden>
-              <span class="attachment-name" id="attachment-name"></span>
+              <span class="attachment-details">
+                <span class="attachment-name" id="attachment-name"></span>
+                <span class="attachment-size" id="attachment-size"></span>
+              </span>
               <button type="button" class="remove-attachment" id="remove-attachment" aria-label="Remover PDF selecionado" title="Remover PDF">&times;</button>
             </div>
             <p class="help-text">O mesmo PDF será anexado a todos os e-mails. Limite recomendado: 10 MB.</p>
@@ -125,6 +129,26 @@
       </section>
     </main>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="spreadsheet-preview-modal" class="modal-overlay" aria-hidden="true">
+      <section class="modal-card spreadsheet-modal-card" role="dialog" aria-modal="true" aria-labelledby="spreadsheet-preview-title">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Conferência dos contatos</p>
+            <h2 id="spreadsheet-preview-title">Pré-visualização da planilha</h2>
+          </div>
+          <button type="button" class="modal-close-btn" id="spreadsheet-preview-close" aria-label="Fechar prévia da planilha">&times;</button>
+        </header>
+        <div class="spreadsheet-preview-content">
+          <div class="table-wrap">
+            <table>
+              <thead id="spreadsheet-preview-head"></thead>
+              <tbody id="spreadsheet-preview-body"></tbody>
+            </table>
+          </div>
+          <p class="help-text">Exibindo até os primeiros 5 contatos válidos da planilha.</p>
+        </div>
+      </section>
+    </div>
     <div id="preview-modal" class="modal-overlay" aria-hidden="true">
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="preview-title">
         <header class="modal-header">
